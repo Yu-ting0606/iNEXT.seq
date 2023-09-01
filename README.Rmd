@@ -1,0 +1,441 @@
+---
+output: github_document
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%"
+)
+library(iNEXT.seq)
+```
+
+`iNEXT.seq` (iNterpolation and EXTrapolation for UniFrac distance) is an R package. In this document, we provide a quick introduction demonstrating how to run `iNEXT.seq`. Detailed information about `iNEXT.seq` functions is provided in the iNEXT.seq manual, also available in [CRAN](https://cran.r-project.org/package=iNEXT.seq). An online version of [iNEXT.seq-online](http://chao.stat.nthu.edu.tw/wordpress/software_download/iNEXT.seq-online/) is also available for users without an R background.
+
+`iNEXT.seq` provides a new way to measure UniFrac distance, by applying dissimilarity measures based on Chiu's et al.'s multiple assemblages decomposition (Chiu, Jost, and Chao (2014)). And we mainly consider three measures of Hill numbers of order q: species richness (`q = 0`), Shannon diversity (`q = 1`, the exponential of Shannon entropy) and Simpson diversity (`q = 2`, the inverse of Simpson concentration).
+
+`iNEXT.seq` uses the observed sample of OTU count data (called the "reference sample") to calculate UniFrac distance estimates and the associated confidence intervals for coverage-based rarefaction and extrapolation (R/E) curve.
+
+`iNEXT.seq` computes dissimilarity as UniFrac distance estimates by doing monotonic transformation on phylogenetic beta diversity for rarefied and extrapolated samples, based on standardized levels of sample completeness (measured by sample coverage). This coverage-based  sampling curve plots the diversity estimates with respect to sample coverage. 
+
+
+## SOFTWARE NEEDED TO RUN iNEXT.seq IN R
+- Required: [R](https://cran.r-project.org/)
+- Suggested: [RStudio IDE](https://www.rstudio.com/products/RStudio/#Desktop)
+
+
+## HOW TO RUN iNEXT.seq:
+The `iNEXT.seq` package is available from [CRAN](https://cran.r-project.org/package=iNEXT.seq) and can be downloaded with a standard R installation procedure or can be downloaded from Anne Chao's [iNEXT.seq_github](https://github.com/yayunteng/iNEXT.seq) using the following commands. For a first-time installation, an additional visualization extension package (`ggplot2`) must be installed and loaded. 
+
+
+```{r, eval=FALSE}
+## install iNEXT.seq package from CRAN
+install.packages("iNEXT.seq")
+
+## install the latest version from github
+install.packages('devtools')
+library(devtools)
+install_github('yayunteng/iNEXT.seq')
+
+## import packages
+library(iNEXT.seq)
+```
+
+
+Here are four main functions we provide in this package : 
+
+- **iNEXTseq** : Computing dissimilarity estimates as UniFrac distances at specified sample coverage.
+
+- **ggiNEXTseq** : Visualizing the output from the function `iNEXTseq`.
+
+- **hierPD** : Calculate estimates for hierarchical phylogenetic gamma, alpha, beta diversity and dissimilarity measures.  
+
+- **gghierPD** : Visualizing the output from the function `hierPD`.
+
+
+## MAIN FUNCTION: iNEXTseq()
+
+We first describe the main function `iNEXTseq()` with default arguments: 
+
+```{r, eval=FALSE}
+iNEXTseq(data, q = c(0, 1, 2), base = "coverage", level = NULL, nboot = 10, 
+             conf = 0.95, PDtree = NULL, PDreftime = NULL)
+```
+
+
+The arguments of this function are briefly described below, and will be explained in more details by illustrative examples in later text. This main function computes gamma, alpha and beta diversity estimates of order q at specified sample coverage or sample size. By default of <code>base = "size"</code> and <code>level = NULL</code>, then this function computes the gamma and alpha diversity estimates up to double the reference sample size in each region. If <code>base = "coverage"</code> and <code>level = NULL</code>, then this function computes the gamma, alpha, beta diversity, and four dissimilarity-turnover indices estimates up to one (for q = 1, 2) or up to the coverage of double the reference sample size (for q = 0).
+
+<table style="width:100%;">
+<colgroup>
+<col width="20%">
+<col width="80%">
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">Argument</th>
+<th align="left">Description</th>
+
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center"><code>data</code></td>
+<td align="left">
+OTU count data can be input as a <code>matrix/data.frame</code> (species by assemblages), or a list of <code>matrices/data.frames</code>, each matrix represents species-by-assemblages abundance matrix.</td>
+
+</tr>
+<tr class="even">
+<td align="center"><code>q</code></td>
+<td align="left">a numerical vector specifying the diversity orders. Default is <code>c(0, 1, 2)</code>.</td>
+
+
+</tr>
+<tr class="odd">
+<td align="center"><code>base</code></td>
+<td align="left">Sample-sized-based rarefaction and extrapolation for gamma and alpha diversity (<code>base = "size"</code>) or coverage-based rarefaction and extrapolation for gamma, alpha and beta diversity (<code>base = "coverage"</code>). Default is <code>base = "coverage"</code>.</td>
+
+
+</tr>
+<tr class="even">
+<td align="center"><code>level</code></td>
+<td align="left">A numerical vector specifying the particular value of sample coverage (between 0 and 1 when <code>base = "coverage"</code>) or sample size (<code>base = "size"</code>). <code>level = 1</code> (<code>base = "coverage"</code>) means complete coverage  \cr
+(the corresponding diversity represents asymptotic diversity). \cr
+If <code>base = "size"</code> and <code>level = NULL</code>, then this function computes the gamma and alpha diversity estimates up to double the reference sample size.  \cr
+If <code>base = "coverage"</code> and <code>level = NULL</code>, then this function computes the gamma and alpha diversity estimates up to one (for <code>q = 1, 2</code>) or up to the coverage of double the reference sample size (for <code>q = 0</code>); the corresponding beta diversity and dissimilarity are computed up to the same maximum coverage as the alpha diversity.</td>
+
+
+</tr>
+<tr class="odd">
+<td align="center"><code>nboot</code></td>
+<td align="left">a positive integer specifying the number of bootstrap replications when assessing sampling uncertainty and constructing confidence intervals. Bootstrap replications are generally time consuming. Enter <code>0</code> to skip the bootstrap procedures. Default is <code>10</code>. Note that large bootstrap replication needs more run time.</td>
+
+</tr>
+<tr class="even">
+<td align="center"><code>conf</code></td>
+<td align="left">a positive number < 1 specifying the level of confidence interval. Default is <code>0.95</code>.</td>
+
+</tr>
+<tr class="odd">
+<td align="center"><code>PDtree</code></td>
+<td align="left">a <code>phylo</code>, a phylogenetic tree in Newick format for all observed species in the pooled assemblage.</td>
+
+</tr>
+<tr class="even">
+<td align="center"><code>PDreftime</code></td>
+<td align="left"> a numerical value specifying reference time for PD. Default is <code>NULL</code> (i.e., the age of the root of PDtree).</td>
+
+</tbody>
+</table>
+
+
+This function returns an `"iNEXTseq"` object which can be further used to make plots 
+using the function `ggiNEXTseq()` to be described below. 
+
+## DATA FORMAT/INFORMATION
+Data should be provided as Individual-based abundance data.
+
+Input data for each region with several assemblages/sites include samples species abundances in an empirical sample of n individuals (“reference sample"). When there are N assemblages in a region, input data consist of a list with an S by N abundance matrix; For M regions consisting N assemblages, input data should be M lists of S by N abundance matrix.
+
+A data set (a microbiome sample take from tongue dorsum and buccal mucosa) is included in `iNEXT.seq` package for illustration. The data consist a species-by-assemblages matrix with two assemblages (tongue and cheek).For the data, the following commands display how to compute UniFrac distance estimate at specified sample coverage.
+
+Run the following code to view `tongue_cheek` OTU count data: (Here we only show the first ten rows for the matrix)
+
+```{r, eval=FALSE}
+data("tongue_cheek")
+tongue_cheek
+```
+
+```{r, echo=FALSE}
+data("tongue_cheek")
+head(tongue_cheek$tongue_cheek, 10)
+```
+
+When `base = 'coverage'`, the `iNEXTseq()` function returns the `"iNEXTseq"` object including seven data frames for each regions: 
+
+- gamma 
+- alpha 
+- beta
+- C (for UniFrac distance measured by Sorensen-type non-overlap )
+- U (for UniFrac distance measured by Jaccard-type  non-overlap )
+- V (for UniFrac distance measured by Sorensen-type turnover )
+- S (for UniFrac distance measured by Jaccard-type  turnover )
+
+When `base = 'size'`, the `iNEXTseq()` function returns the `"iNEXTseq"` object including two data frames for each regions: 
+
+- gamma 
+- alpha 
+
+## Rarefaction/Extrapolation Via Examples
+
+Run the `iNEXTseq()` function with `tongue_cheek` data to compute UniFrac 
+distance standardized by sample coverage. (Here we only show the first six rows for each output data frame)
+
+```{r, eval=FALSE}
+data("tongue_cheek")
+data("tongue_cheek_tree")
+
+out = iNEXTseq(data = tongue_cheek, q = c(0, 1, 2), nboot = 10, 
+                   PDtree = tongue_cheek_tree, PDreftime = NULL)
+```
+
+```{r, echo=FALSE}
+out = iNEXTseq(data = tongue_cheek, q = c(0, 1, 2), nboot = 10, 
+                   PDtree = tongue_cheek_tree, PDreftime = NULL)
+##修改
+lapply(out$tongue_cheek, function(x) {
+    tmp = x[1:6,]
+    tmp[,c('Estimate', 'Size', 's.e.', 'LCL', 'UCL')] = round(tmp[,c('Estimate', 'Size', 's.e.', 'LCL', 'UCL')], 3)
+    tmp
+})
+```
+
+The output contains seven data frames: `gamma`, `alpha`, `beta`, `C`, `U`, `V`, `S`. For each data frame, it includes the diversity estimate (`Estimate`), the diversity order (`Order.q`), `Method` (Interpolated, Observed, or Extrapolated, depending on whether the size `m` is less than, equal to, or greater than the reference sample size), the sample coverage estimate (`SC`), the sample size (`Size`), the standard error from bootstrap replications (`s.e.`), the 95% lower and upper confidence limits of diversity (`LCL`, `UCL`), and the name of region (`Region`). These diversity estimates with confidence intervals are used for plotting the diversity curve.
+
+## GRAPHIC DISPLAYS: FUNCTION ggiNEXTseq()
+
+The function `ggiNEXTseq()`, which extends `ggplot2` to the `"iNEXTseq"` object with default arguments, is described as follows: 
+
+```{r eval=FALSE}
+ggiNEXTseq(output, type = "B", scale = "fixed", transp = 0.4)  
+```
+
+<table style="width:100%;">
+<colgroup>
+<col width="20%">
+<col width="80%">
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">Argument</th>
+<th align="left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center"><code>output</code></td>
+<td align="left">the output of <code>iNEXTseq</code>.</td>
+
+</tr>
+<tr class="even">
+<td align="center"><code>type</code></td>
+<td align="left">selection of plot type : type = 'B' for plotting the gamma, alpha, and beta diversity; type = 'D' for plotting 4 dissimilarities.</td>
+
+
+</tr>
+<tr class="odd">
+<td align="center"><code>scale</code></td>
+<td align="left">Are scales shared across all facets (the default, <code>"fixed"</code>), or do they vary across rows (<code>"free_x"</code>), columns (<code>"free_y"</code>), or both rows and columns (<code>"free"</code>)?</td>
+
+</tr>
+<tr class="even">
+<td align="center"><code>transp</code></td>
+<td align="left">a value between 0 and 1 controlling transparency. <code>transp = 0</code> is completely transparent, default is <code>0.4</code>.</td>
+
+
+</tbody>
+</table>
+
+
+The `ggiNEXTseq()` function is a wrapper around the `ggplot2` package to create a R/E curve using a single line of code. The resulting object is of class `"ggplot"`, so it can be manipulated using the `ggplot2` tools. Users can visualize the output of beta diversity or four dissimilarities by setting the parameter <code>**type**</code>:
+
+```{r eval=FALSE}
+out = iNEXTseq(data = tongue_cheek, q = c(0, 1, 2), nboot = 10, 
+                   PDtree = tongue_cheek_tree, PDreftime = NULL)
+ggiNEXTseq(out, type = "B")
+```
+
+```{r, fig.align='center', fig.height=6, fig.width=6, echo=FALSE}
+ggiNEXTseq(out, type = "B")
+```
+
+```{r, fig.align='center', fig.height=8, fig.width=6}
+ggiNEXTseq(out, type = "D")
+```
+
+
+The following commands return the size-based R/E sampling curves for gamma and alpha diversity:
+
+```{r, fig.align='center', fig.height=4, fig.width=6}
+out = iNEXTseq(data = tongue_cheek, q = c(0, 1, 2), base = "size", 
+                   nboot = 10, PDtree = tongue_cheek_tree, PDreftime = NULL)
+ggiNEXTseq(out)
+```
+
+
+## HIERARCHICAL PHYLOGENETIC FUNCTION: hierPD()
+
+We first describe the main function `hierPD()` with default arguments: 
+
+```{r, eval=FALSE}
+hierPD(data, mat, PDtree, q = seq(0, 2, 0.2), weight = "size", nboot = 20,
+             conf = 0.95, type = "mle", decomposition = "relative")
+```
+
+The arguments of this function are briefly described below, and will be explained in more details by illustrative examples in later text. This main function calculate empirical estimates for hierarchical phylogenetic gamma, alpha, beta diversity and dissimilarity measure. 
+
+<table style="width:100%;">
+<colgroup>
+<col width="20%">
+<col width="80%">
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">Argument</th>
+<th align="left">Description</th>
+
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center"><code>data</code></td>
+<td align="left">OTU data can be input as a <code>matrix/data.frame</code> (species by assemblages). Row names of input data should be names of OTU, and column names should be names of assemblages.</td>
+
+</tr>
+<tr class="even">
+<td align="center"><code>mat</code></td>
+<td align="left">Hierarchical structure of data should be input as a <code>matrix</code>.</td> 
+
+
+</tr>
+<tr class="odd">
+<td align="center"><code>q</code></td>
+<td align="left">a numerical vector specifying the diversity orders. Default is <code>seq(0, 2, 0.2)</code>.</td>
+
+
+</tr>
+<tr class="even">
+<td align="center"><code>weight</code></td>
+<td align="left">Weight for relative decomposition. Default is <code>"size"</code>.</td>
+
+
+</tr>
+<tr class="odd">
+<td align="center"><code>nboot</code></td>
+<td align="left"a positive integer specifying the number of bootstrap replications when assessing sampling uncertainty and constructing confidence intervals. Bootstrap replications are generally time consuming. Enter <code>0</code> to skip the bootstrap procedures. Default is <code>20</code>.</td>
+
+
+</tr>
+<tr class="even">
+<td align="center"><code>conf</code></td>
+<td align="left">a positive number < 1 specifying the level of confidence interval. Default is <code>0.95</code>.</td>
+
+
+</tr>
+<tr class="odd">
+<td align="center"><code>type</code></td>
+<td align="left">estimate type: estimate (<code>type = "est"</code>), empirical estimate (<code>type = "mle"</code>). Default is <code>"mle"</code>.</td>
+
+
+</tr>
+<tr class="even">
+<td align="center"><code>decomposition</code></td>
+<td align="left">relative decomposition: (<code>decomposition = "relative"</code>), Absolute decomposition: (<code>decomposition = "absolute"</code>).</td>
+
+
+</tr>
+<tr class="odd">
+<td align="center"><code>PDtree</code></td>
+<td align="left">a phylogenetic tree in Newick format for all observed species in the pooled assemblage.</td>
+
+</tbody>
+</table>
+
+The `hierPD()` function returns the `"hierPD"` object including Method (gamma, alpha, beta and four dissimilarities), Order.q, Estimator, Bootstrap S.E., LCL, UCL, Decomposition. 
+And it can be further used to make plots using the function `gghierPD()` to be described below. 
+
+
+Following commands display how to use this function. The sample data is about SSR data of antechinus in Australia. Run the following code to view `antechinus` OTU count data: (Here we only show the first six rows for the matrix)
+
+```{r, eval=FALSE}
+data("antechinus")
+antechinus
+```
+
+```{r, echo=FALSE}
+data("antechinus")
+head(antechinus, 6)
+```
+
+
+Run the `hierPD()` function with `antechinus` data. (Here we only show the first fifteen rows for output data frame)
+
+```{r, eval=FALSE}
+data("antechinus")
+data("antechinus_mat")
+data("antechinus_tree")
+
+hier_output <- hierPD(antechinus, mat = antechinus_mat, PDtree = antechinus_tree, q = seq(0, 2, 0.2))
+```
+
+```{r, echo=FALSE}
+data("antechinus")
+data("antechinus_mat")
+data("antechinus_tree")
+
+hier_output <- hierPD(antechinus, mat = antechinus_mat, PDtree = antechinus_tree, q = seq(0, 2, 0.2))
+hier_output[1:15,]
+```
+
+The output dataframe includes: `Method`(gamma, alpha, beta, C, U, V, S), the diversity order (`Order.q`), diversity estimate (`Estimate`), standard error from bootstrap replications (`Bootstrap S.E.`), 95% lower and upper confidence limits of diversity (`LCL`, `UCL`), `Decomposition`. 
+
+## GRAPHIC DISPLAYS: FUNCTION gghierPD()
+
+The function `gghierPD()`, which extends `ggplot2` to the `"hierPD"` object with default arguments, is described as follows: 
+
+```{r eval=FALSE}
+gghierPD(hier_output, method = "A")  
+```
+
+<table style="width:100%;">
+<colgroup>
+<col width="20%">
+<col width="80%">
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">Argument</th>
+<th align="left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center"><code>hier_output</code></td>
+<td align="left">the output of <code>hierPD</code>.</td>
+
+</tr>
+<tr class="even">
+<td align="center"><code>method</code></td>
+<td align="left">selection of plot type : method = 'A' for diversity(alpha, gamma); method = 'B' for beta diversity; method = 'D' dissimilarity measure based on multiplicative decomposition.</td>
+
+</tbody>
+</table>
+
+
+The `gghierPD()` function is a wrapper around the `ggplot2` package to create a curve using a single line of code. The resulting object is of class `"ggplot"`, so it can be manipulated using the `ggplot2` tools. Users can visualize the output of diversity or four dissimilarities by setting the parameter <code>**method**</code>:
+
+```{r eval=FALSE}
+hier_output <- hierPD(antechinus, mat = antechinus_mat, PDtree = antechinus_tree, q = seq(0, 2, 0.2))
+gghierPD(hier_output, method = "A")
+```
+
+```{r, fig.align='center', fig.height=4, fig.width=4, echo=FALSE}
+gghierPD(hier_output, method = "A")
+```
+
+```{r, fig.align='center', fig.height=5, fig.width=4}
+gghierPD(hier_output, method = "D")
+```
+
+
+## HOW TO CITE iNEXT.seq
+If you publish your work based on the results from the `iNEXT.seq` package, you should make references to the following methodology paper: 
+
+- Chao, A., Thorn, S., Chiu, C.-H., Moyes, F., Hu, K.-H., Chazdon, R. L., Wu, J., Dornelas, M., Zelený, D., Colwell, R. K., and Magurran, A. E. (2023). Rarefaction and extrapolation with beta diversity under a framework of Hill numbers: the iNEXT.beta3D standardization. To appear in Ecological Monographs.
+
+## References
+- Chiu, C.-H., Jost, L. and Chao*, A. (2014). Phylogenetic beta diversity, similarity, and differentiation measures based on Hill numbers. Ecological Monographs 84, 21-44.
+
